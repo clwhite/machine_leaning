@@ -4,18 +4,6 @@ import sys
 import inspect
 
 
-def _setup_logging():
-  root = logging.getLogger()
-  root.setLevel(logging.DEBUG)
-
-  ch = logging.StreamHandler(sys.stdout)
-  ch.setLevel(logging.DEBUG)
-  formatter = logging.Formatter(
-      '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-  ch.setFormatter(formatter)
-  root.addHandler(ch)
-
-
 def test_constant():
   # test hello
   with tf.Session() as sess:
@@ -90,14 +78,6 @@ def test_reduce_mean():
     print "reduce [[1,2], [3,4]] colum:%s" % ss.run(m3)
 
 
-def do():
-  funcs = []
-  for name, obj in inspect.getmembers(sys.modules[__name__]):
-    if inspect.isfunction(obj) and name.startswith('test'):
-      funcs.append(obj)
-  return funcs
-
-
 def test_assign():
   state = tf.Variable(0, name='counter')
 
@@ -132,10 +112,37 @@ def test_feed():
     print("run result:%s (type:%s)" % (result, type(result)))
 
 
+def test_read_file():
+  filename_queue = tf.train.string_input_producer(["data-01-test-score.csv"],
+                                                  shuffle=False,
+                                                  name='filename_queue')
+
+  reader = tf.TextLineReader()
+  key, value = reader.read(filename_queue)
+
+  record_defaults = [[1.], [1.], [1.], [1.], [1.]]
+  col1, col2, col3, total = tf.decode_csv(value,
+                                          record_defaults=record_defaults)
+  features = tf.stack([col1, col2, col3])
+
+  with tf.Session() as sess:
+    coord = tf.train.Coordinator()
+    thread = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+    for i in range(1200):
+      exam, result = sess.run([features, total])
+      print "exam:%s, result:%s" % sess.run(exam, result)
+
+    coord.request_stop()
+    coord.join(thread)
+
+
 if __name__ == '__main__':
-  _setup_logging()
-  funcs = do()
+  funcs = []
+  for name, obj in inspect.getmembers(sys.modules[__name__]):
+    if inspect.isfunction(obj) and name.startswith('test'):
+      funcs.append(obj)
   logging.info("test functions:%s", funcs)
   for f in funcs:
-    logging.info("Test-%s", f.__name__)
+    logging.info("###############Test-%s", f.__name__)
     f()
